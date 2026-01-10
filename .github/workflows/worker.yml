@@ -3,7 +3,11 @@ name: OCI Worker (Public)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '0 */6 * * *' # Run every 6 hours (matches max runtime)
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
   worker:
