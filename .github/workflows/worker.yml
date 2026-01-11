@@ -2,10 +2,13 @@ name: OCI Worker (Public)
 
 on:
   workflow_dispatch:
+    inputs:
+      task_id:
+        description: 'Task ID to execute'
+        required: false
+        type: string
   schedule:
-    - cron: '0 */6 * * *' # Run every 6 hours (matches max runtime)
-
-
+    - cron: '*/5 * * * *' # Backup polling (every 5 min to catch idle tasks)
 
 jobs:
   worker:
@@ -29,12 +32,20 @@ jobs:
         run: |
           echo "Checking connectivity to $OCI_SERVER_URL..."
           curl -v "$OCI_SERVER_URL/health" || echo "Warning: Connectivity check failed"
-          curl -v "$OCI_SERVER_URL/" || echo "Warning: Root check failed"
+          # curl -v "$OCI_SERVER_URL/" || echo "Warning: Root check failed"
 
       - name: Run Worker
         env:
           OCI_SERVER_URL: ${{ secrets.OCI_SERVER_URL }}
           OCI_WORKER_TOKEN: ${{ secrets.OCI_WORKER_TOKEN }}
+          TASK_ID: ${{ inputs.task_id }}
         run: |
           # Run for up to 350 minutes (approx 6h limit)
-          timeout 350m ./oci-manager worker --server-url "$OCI_SERVER_URL" --token "$OCI_WORKER_TOKEN" || true
+          CMD="./oci-manager worker --server-url \"$OCI_SERVER_URL\" --token \"$OCI_WORKER_TOKEN\""
+          
+          if [ ! -z "$TASK_ID" ]; then
+            CMD="$CMD --task-id \"$TASK_ID\""
+            echo "Starting worker for specific Task ID: $TASK_ID"
+          fi
+          
+          timeout 350m sh -c "$CMD" || true
